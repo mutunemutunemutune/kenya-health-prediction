@@ -1,0 +1,13 @@
+date,cases,region,disease_type
+2020-01-01,150,Nairobi,HIV
+2020-02-01,165,Nairobi,HIV
+2020-03-01,180,Nairobi,HIV
+2020-04-01,195,Nairobi,HIV
+2020-05-01,210,Nairobi,HIV
+2020-06-01,225,Nairobi,HIV
+2020-07-01,240,Nairobi,HIV
+2020-08-01,255,Nairobi,HIV
+2020-09-01,270,Nairobi,HIV
+2020-10-01,285,Nairobi,HIV
+2020-11-01,300,Nairobi,HIV
+2020-12-01,315,Nairobi,HIV 

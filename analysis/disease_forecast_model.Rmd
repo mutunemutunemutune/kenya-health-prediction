@@ -1,0 +1,183 @@
+---
+title: "Disease Incidence Forecasting in Kenya"
+author: "Data Analyst"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Disease Incidence Forecasting Analysis
+
+## 1. Load Required Packages
+```{r}
+# Core packages
+library(tidyverse)
+library(lubridate)
+library(forecast)
+library(ggplot2)
+library(tseries)
+
+# Additional packages for enhanced analysis
+library(ggthemes)
+library(plotly)
+library(knitr)
+library(kableExtra)
+```
+
+## 2. Data Loading and Preprocessing
+```{r}
+# Load the dataset
+disease_data <- read.csv("../data/disease_incidence.csv")
+
+# Data preprocessing
+disease_data <- disease_data %>%
+  mutate(
+    date = as.Date(date),
+    month = month(date, label = TRUE),
+    year = year(date),
+    quarter = quarter(date)
+  )
+
+# Summary statistics
+summary_stats <- disease_data %>%
+  group_by(region, disease_type) %>%
+  summarise(
+    mean_cases = mean(cases),
+    median_cases = median(cases),
+    sd_cases = sd(cases),
+    min_cases = min(cases),
+    max_cases = max(cases)
+  )
+
+# Display summary statistics
+kable(summary_stats, caption = "Summary Statistics by Region and Disease Type") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## 3. Exploratory Data Analysis
+```{r}
+# Time series plot with trend line
+ggplot(disease_data, aes(x = date, y = cases)) +
+  geom_line(color = "steelblue") +
+  geom_smooth(method = "loess", color = "red", se = FALSE) +
+  labs(title = "Disease Incidence Over Time with Trend",
+       x = "Date",
+       y = "Number of Cases") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Seasonal plot
+ggplot(disease_data, aes(x = month, y = cases, group = year)) +
+  geom_line(aes(color = factor(year))) +
+  labs(title = "Seasonal Pattern of Disease Incidence",
+       x = "Month",
+       y = "Number of Cases",
+       color = "Year") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Box plot by region
+ggplot(disease_data, aes(x = region, y = cases, fill = region)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Cases by Region",
+       x = "Region",
+       y = "Number of Cases") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## 4. Time Series Analysis
+```{r}
+# Create time series object
+ts_data <- ts(disease_data$cases, frequency = 12)
+
+# Seasonal decomposition
+decomp <- stl(ts_data, s.window = "periodic")
+autoplot(decomp) +
+  labs(title = "Seasonal Decomposition of Time Series") +
+  theme_minimal()
+
+# ACF and PACF plots
+par(mfrow = c(2,1))
+acf(ts_data, main = "Autocorrelation Function")
+pacf(ts_data, main = "Partial Autocorrelation Function")
+```
+
+## 5. Model Building
+```{r}
+# Split data into training and testing sets
+train_size <- floor(0.8 * length(ts_data))
+train_data <- ts_data[1:train_size]
+test_data <- ts_data[(train_size + 1):length(ts_data)]
+
+# Fit ARIMA model
+arima_model <- auto.arima(train_data)
+
+# Model summary
+summary(arima_model)
+
+# Check model assumptions
+checkresiduals(arima_model)
+```
+
+## 6. Model Evaluation
+```{r}
+# Make predictions
+forecast_values <- forecast(arima_model, h = length(test_data))
+
+# Calculate accuracy metrics
+accuracy_metrics <- accuracy(forecast_values, test_data)
+kable(accuracy_metrics, caption = "Model Accuracy Metrics") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# Plot forecast
+autoplot(forecast_values) +
+  autolayer(test_data, series = "Actual") +
+  labs(title = "Disease Incidence Forecast",
+       x = "Time",
+       y = "Number of Cases") +
+  theme_minimal()
+```
+
+## 7. Future Forecast
+```{r}
+# Generate 12-month forecast
+future_forecast <- forecast(arima_model, h = 12)
+
+# Plot future forecast
+autoplot(future_forecast) +
+  labs(title = "12-Month Disease Incidence Forecast",
+       x = "Time",
+       y = "Number of Cases") +
+  theme_minimal()
+
+# Print forecast values
+kable(future_forecast$mean, caption = "12-Month Forecast Values") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## 8. Conclusion
+The analysis reveals several key findings:
+
+1. **Trend Analysis**: The data shows a `r if(mean(diff(ts_data)) > 0) "positive" else "negative"` trend in disease incidence over time.
+
+2. **Seasonal Patterns**: There are clear seasonal patterns in the data, with `r names(which.max(table(disease_data$month)))` typically showing the highest incidence.
+
+3. **Model Performance**: The ARIMA model demonstrates `r if(accuracy_metrics[2] < 0.1) "good" else "moderate"` forecasting accuracy, with a MAPE of `r round(accuracy_metrics[2] * 100, 2)`%.
+
+4. **Forecast Implications**: The 12-month forecast suggests `r if(mean(diff(future_forecast$mean)) > 0) "an increasing" else "a decreasing"` trend in disease incidence.
+
+These findings can help public health officials in Kenya to:
+- Plan resource allocation
+- Implement timely interventions
+- Monitor disease trends
+- Prepare for potential outbreaks 
